@@ -14,3 +14,6 @@ chmod +x "${VENV}/bin/solc"
 # Python
 pipenv run pip3 install -e .
 pipenv install --dev
+
+#Populus
+export PYTEST_POPULUS_PROJECT="./nkms_eth/project/"
