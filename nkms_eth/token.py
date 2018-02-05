@@ -1,38 +1,39 @@
-from nkms_eth import blockchain
-
-CONTRACT_NAME = 'NuCypherKMSToken'  # TODO this should be NuCypher's class
-SUBDIGITS = 18
-M = 10 ** SUBDIGITS
-PREMINE = int(1e9) * M
-SATURATION = int(1e10) * M
 
 
-def create():
-    """
-    Creates a contract with tokens and returns it.
-    If it was already created, just returns the already existing contract
+class NuCypherKMSToken(object):
+    contract_name = 'NuCypherKMSToken'  # TODO this should be NuCypher's class
+    subdigits = 18
+    M = 10 ** subdigits
+    premine = int(1e9) * M
+    saturation = int(1e10) * M
 
-    :returns:   Token contract object
-    """
-    chain = blockchain.chain()
-    web3 = chain.web3
-    creator = web3.eth.accounts[0]  # TODO: make it possible to override
+    def __init__(self, blockchain, contract=None):
+        self.blockchain = blockchain
 
-    token, tx = chain.provider.get_or_deploy_contract(
-        CONTRACT_NAME, deploy_args=[PREMINE, SATURATION],
-        deploy_transaction={'from': creator})
-    if tx:
-        chain.wait.for_receipt(tx, timeout=blockchain.TIMEOUT)
+        with self.blockchain as chain:
+            creator = chain.web3.eth.accounts[0]              # TODO: make it possible to override
+            if not contract:
+                contract, txhash = chain.provider.deploy_contract(
+                                   self.contract_name,
+                                   deploy_args=[self.premine, self.saturation],
+                                   deploy_transaction={'from': creator})
 
-    return token
+                chain.wait.for_receipt(txhash, timeout=self.blockchain.timeout)
 
+            self.contract = contract
 
-def get(name=CONTRACT_NAME):
-    """
-    Gets an existing contract or returns an error
-    """
-    return blockchain.chain().provider.get_contract(name)
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        return f"{class_name}(blockchain={self.blockchain})"
 
+    def __call__(self, *args, **kwargs):
+        return self.contract.call(*args, **kwargs)
 
-def balance(address: str):
-    return get().call().balanceOf(address)
+    def balance(self, address: str):
+        return self().balanceOf(address)
+
+    @classmethod
+    def get(cls, blockchain):
+        """Gets an existing contract or returns an error"""
+        contract = blockchain.get_contract(cls.contract_name)
+        return cls(blockchain=blockchain, contract=contract)
