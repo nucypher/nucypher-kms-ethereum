@@ -21,19 +21,19 @@ def airdrop(blockchain, token) -> None:
         blockchain.chain.wait.for_receipt(tx, timeout=10)
 
 
-def test_deposit(testerchain, ursula, token):
+def test_deposit(testerchain, miner, token):
     airdrop(testerchain, token)
     ursula.lock(amount=1000*M,
                 locktime=100,
                 address=testerchain.web3.eth.accounts[1])
 
 
-def test_select_ursulas(testerchain, ursula, escrow, token):
+def test_select_ursulas(testerchain, miner, escrow, token):
     airdrop(testerchain, token)
 
     # Create a random set of miners (we have 9 in total)
     for u in testerchain.web3.eth.accounts[1:]:
-        ursula.lock((10 + random.randrange(9000)) * M, 100, u)
+        miner.lock((10 + random.randrange(9000)) * M, 100, u)
         testerchain.wait.for_block(testerchain.web3.eth.blockNumber + escrow.BLOCKS_PER_PERIOD)
 
     miners = escrow.sample(3)
@@ -44,7 +44,7 @@ def test_select_ursulas(testerchain, ursula, escrow, token):
         escrow.sample(100)  # Waay more than we have deployed
 
 
-def test_mine_withdraw(testerchain, ursula, token, escrow):
+def test_mine_withdraw(testerchain, miner, token, escrow):
     airdrop(testerchain, token)
 
     addr = testerchain.web3.eth.accounts[1]
@@ -52,14 +52,14 @@ def test_mine_withdraw(testerchain, ursula, token, escrow):
 
     # Create a random set of miners (we have 9 in total)
     for u in testerchain.web3.eth.accounts[1:]:
-        ursula.lock(amount=(10 + random.randrange(9000))*M,
+        miner.lock(amount=(10 + random.randrange(9000))*M,
                     locktime=1,
                     address=u)
 
         testerchain.chain.wait.for_block(testerchain.web3.eth.blockNumber + 2 * escrow.BLOCKS_PER_PERIOD)
 
-    ursula.mine(addr)
-    ursula.withdraw(addr)
+    miner.mine(addr)
+    miner.withdraw(addr)
     final_balance = token.balance(addr)
 
     assert final_balance > initial_balance
