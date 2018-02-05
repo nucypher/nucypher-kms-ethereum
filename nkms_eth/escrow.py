@@ -52,7 +52,7 @@ class Escrow:
 
         """
 
-        n_select = round(quantity*1.7)  # Select more Ursulas
+        n_select = round(quantity*1.7)            # Select more Ursulas
         n_tokens = self().getAllLockedTokens()
         duration = 10
 
