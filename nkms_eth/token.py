@@ -1,39 +1,49 @@
 
 
-class NuCypherKMSToken(object):
-    contract_name = 'NuCypherKMSToken'  # TODO this should be NuCypher's class
+class NuCypherKMSToken:
+    token_name = 'NuCypherKMSToken'
     subdigits = 18
     M = 10 ** subdigits
     premine = int(1e9) * M
     saturation = int(1e10) * M
 
-    def __init__(self, blockchain, contract=None):
-        self.blockchain = blockchain
-
-        with self.blockchain as chain:
+    def __init__(self, blockchain, token_contract=None):
+        with blockchain as chain:
             creator = chain.web3.eth.accounts[0]              # TODO: make it possible to override
-            if not contract:
-                contract, txhash = chain.provider.deploy_contract(
-                                   self.contract_name,
+            if not token_contract:                            # Deploy a new contract
+                token_contract, txhash = chain.provider.deploy_contract(
+                                   self.token_name,
                                    deploy_args=[self.premine, self.saturation],
                                    deploy_transaction={'from': creator})
 
-                chain.wait.for_receipt(txhash, timeout=self.blockchain.timeout)
+                chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
 
-            self.contract = contract
+            self.blockchain = blockchain
+            self.contract = token_contract
 
     def __repr__(self):
         class_name = self.__class__.__name__
-        return f"{class_name}(blockchain={self.blockchain})"
+        return "{}(blockchain={})".format(class_name, self.blockchain)
 
     def __call__(self, *args, **kwargs):
+        """Invoke contract -> No state change"""
         return self.contract.call(*args, **kwargs)
 
+    def get_addresses(self):
+        """Retrieve all known addresses for this contract"""
+        with self.blockchain as chain:
+            return chain.registrar.get_contract_address(self.token_name)
+
+    def transact(self, *args, **kwargs):
+        """Invoke contract -> State change"""
+        return self.contract.transact(*args, **kwargs)
+
     def balance(self, address: str):
+        """Get the balance of a token address"""
         return self().balanceOf(address)
 
     @classmethod
     def get(cls, blockchain):
-        """Gets an existing contract or returns an error"""
-        contract = blockchain.get_contract(cls.contract_name)
-        return cls(blockchain=blockchain, contract=contract)
+        """Gets an existing token contract or returns an error"""
+        contract = blockchain.get_contract(cls.token_name)
+        return cls(blockchain=blockchain, token_contract=contract)
