@@ -8,15 +8,15 @@ class NuCypherKMSToken:
     saturation = int(1e10) * M
 
     def __init__(self, blockchain, token_contract=None):
-        with blockchain as chain:
-            creator = chain.web3.eth.accounts[0]              # TODO: make it possible to override
+            creator = blockchain.web3.eth.accounts[0]         # TODO: make it possible to override
             if not token_contract:                            # Deploy a new contract
-                token_contract, txhash = chain.provider.deploy_contract(
+                token_contract, txhash = blockchain.chain.provider.deploy_contract(
                                    self.token_name,
                                    deploy_args=[self.premine, self.saturation],
                                    deploy_transaction={'from': creator})
 
-                chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
+                if txhash:
+                    blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
 
             self.blockchain = blockchain
             self.contract = token_contract
@@ -29,10 +29,18 @@ class NuCypherKMSToken:
         """Invoke contract -> No state change"""
         return self.contract.call(*args, **kwargs)
 
+    def __eq__(self, other):
+        return self.contract.address == other.contract.address
+
+    @classmethod
+    def get(cls, blockchain):
+        """Gets an existing token contract or returns an error"""
+        contract = blockchain.chain.provider.get_contract(cls.token_name)
+        return cls(blockchain=blockchain, token_contract=contract)
+
     def get_addresses(self):
         """Retrieve all known addresses for this contract"""
-        with self.blockchain as chain:
-            return chain.registrar.get_contract_address(self.token_name)
+        return self.blockchain.chain.registrar.get_contract_address(self.token_name)
 
     def transact(self, *args, **kwargs):
         """Invoke contract -> State change"""

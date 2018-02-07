@@ -2,7 +2,6 @@ import random
 from typing import List
 
 from .blockchain import Blockchain
-from .token import NuCypherKMSToken
 
 addr = str
 
@@ -60,7 +59,6 @@ class Escrow:
 
         n_select = round(quantity*additional_ursulas)            # Select more Ursulas
         n_tokens = self().getAllLockedTokens()
-        duration = 10
 
         for _ in range(attempts):  # number of tries
             points = [0] + sorted(random.randrange(n_tokens) for _ in range(n_select))
