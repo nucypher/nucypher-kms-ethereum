@@ -23,34 +23,43 @@ class Escrow:
 
     def __init__(self, blockchain, token, contract=None):
 
-        with blockchain as chain:
-            creator = chain.web3.eth.accounts[0]  # TODO: make it possible to override
-            if not contract:
-                contract, txhash = chain.provider.deploy_contract(
-                    self.escrow_name,
-                    deploy_args=[token.contract.address]+self.mining_coeff,
-                    deploy_transaction={'from': creator})
+        creator = blockchain.chain.web3.eth.accounts[0]  # TODO: make it possible to override
+        if not contract:
+            contract, txhash = blockchain.chain.provider.deploy_contract(
+                self.escrow_name,
+                deploy_args=[token.contract.address]+self.mining_coeff,
+                deploy_transaction={'from': creator})
 
-                chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
-                txhash = token.contract.transact({'from': creator}).addMiner(contract.address)
-                chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
+            blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
+            txhash = token.contract.transact({'from': creator}).addMiner(contract.address)
+            blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
 
-            self.contract = contract
+        self.blockchain = blockchain
+        self.contract = contract
+        self.token = token
 
     def __call__(self, *args, **kwargs):
         return self.contract.call()
 
+    def __eq__(self, other):
+        return self.contract.address == other.contract.address
+
     @classmethod
     def get(cls, blockchain, token):
         """ Returns an escrow object or an error """
-        contract = blockchain.get_contract(cls.escrow_name)
+        contract = blockchain.chain.provider.get_contract(cls.escrow_name)
         return cls(blockchain=blockchain, token=token, contract=contract)
 
-    def confirm_activity(self, address):
-        """Confirm activity for future period"""
-        return self.contract.transact({'from': address}).confirmActivity()
+    def transact(self, *args, **kwargs):
+        return self.contract.transact(*args, **kwargs)
 
-    def sample(self, quantity: int=10, additional_ursulas: float=1.7, attempts: int=5) -> List[addr]:
+    def confirm_activity(self, address: str) -> str:
+        with self.blockchain as chain:
+            tx = self.contract.transact({'from': address}).confirmActivity()
+            chain.wait.for_receipt(tx)
+        return tx
+
+    def sample(self, quantity: int=10, additional_ursulas: float=1.7, attempts: int=5, duration: int=10) -> List[addr]:
         """
         Select n random staking Ursulas, according to their stake distribution.
         The returned addresses are shuffled, so one can request more than needed and

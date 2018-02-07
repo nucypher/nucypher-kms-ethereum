@@ -50,8 +50,13 @@ class NuCypherKMSToken:
         """Get the balance of a token address"""
         return self().balanceOf(address)
 
-    @classmethod
-    def get(cls, blockchain):
-        """Gets an existing token contract or returns an error"""
-        contract = blockchain.get_contract(cls.token_name)
-        return cls(blockchain=blockchain, token_contract=contract)
+    def airdrop(self, amount: int=10000):
+        creator, *addresses = self.blockchain.web3.eth.accounts
+
+        def txs():
+            for address in addresses:
+                yield self.transact({'from': creator}).transfer(address, amount*self.M)
+
+        for tx_hash in txs():
+            self.blockchain.chain.wait.for_receipt(tx_hash, timeout=self.blockchain.timeout)
+
