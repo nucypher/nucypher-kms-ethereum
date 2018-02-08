@@ -2,22 +2,22 @@ import pytest
 from ethereum.tester import TransactionFailed
 
 
-def test_create_token(web3, chain):
+def test_create_token(testerchain):
     """
     These are tests for standard tokens taken from Consensys github:
     https://github.com/ConsenSys/Tokens/
     but some of the tests are converted from javascript to python
     """
+    chain = testerchain.chain
 
-    creator = web3.eth.accounts[1]
-    account1 = web3.eth.accounts[0]
-    account2 = web3.eth.accounts[2]
+    creator = chain.web3.eth.accounts[1]
+    account1 = chain.web3.eth.accounts[0]
+    account2 = chain.web3.eth.accounts[2]
 
     # Create an ERC20 token
     token, txhash = chain.provider.get_or_deploy_contract(
             'NuCypherKMSToken', deploy_args=[10 ** 9, 10 ** 10],
-            deploy_transaction={
-                'from': creator})
+            deploy_transaction={'from': creator})
     assert txhash is not None
 
     # Account balances
@@ -31,8 +31,7 @@ def test_create_token(web3, chain):
 
     # Cannot send ethers to the contract
     with pytest.raises(TransactionFailed):
-        tx = web3.eth.sendTransaction({
-            'from': account1, 'to': token.address, 'value': 10 ** 9})
+        tx = chain.web3.eth.sendTransaction({'from': account1, 'to': token.address, 'value': 10 ** 9})
         chain.wait.for_receipt(tx)
 
     # Can transfer tokens
