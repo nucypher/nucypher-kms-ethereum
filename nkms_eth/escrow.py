@@ -1,4 +1,4 @@
-import random
+from random import SystemRandom
 from typing import List
 
 from .blockchain import Blockchain
@@ -23,15 +23,14 @@ class Escrow:
 
     def __init__(self, blockchain, token, contract=None):
 
-        creator = blockchain.chain.web3.eth.accounts[0]  # TODO: make it possible to override
         if not contract:
             contract, txhash = blockchain.chain.provider.deploy_contract(
                 self.escrow_name,
                 deploy_args=[token.contract.address]+self.mining_coeff,
-                deploy_transaction={'from': creator})
+                deploy_transaction={'from': token.creator})
 
             blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
-            txhash = token.contract.transact({'from': creator}).addMiner(contract.address)
+            txhash = token.contract.transact({'from': token.creator}).addMiner(contract.address)
             blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
 
         self.blockchain = blockchain
@@ -65,12 +64,12 @@ class Escrow:
         The returned addresses are shuffled, so one can request more than needed and
         throw away those which do not respond.
         """
-
+        system_random = SystemRandom()
         n_select = round(quantity*additional_ursulas)            # Select more Ursulas
         n_tokens = self().getAllLockedTokens()
 
         for _ in range(attempts):  # number of tries
-            points = [0] + sorted(random.randrange(n_tokens) for _ in range(n_select))
+            points = [0] + sorted(system_random.randrange(n_tokens) for _ in range(n_select))
             deltas = [i-j for i, j in zip(points[1:], points[:-1])]
 
             addrs, addr, shift = set(), self.null_addr, 0
@@ -79,6 +78,6 @@ class Escrow:
                 addrs.add(addr)
 
             if len(addrs) >= quantity:
-                return random.sample(addrs, quantity)
+                return system_random.sample(addrs, quantity)
 
         raise Blockchain.NotEnoughUrsulas('Not enough Ursulas.')

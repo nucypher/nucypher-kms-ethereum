@@ -1,3 +1,5 @@
+from populus.contracts.contract import PopulusContract
+from .blockchain import Blockchain
 
 
 class NuCypherKMSToken:
@@ -7,13 +9,14 @@ class NuCypherKMSToken:
     premine = int(1e9) * M
     saturation = int(1e10) * M
 
-    def __init__(self, blockchain, token_contract=None):
-            creator = blockchain.web3.eth.accounts[0]         # TODO: make it possible to override
-            if not token_contract:                            # Deploy a new contract
+    def __init__(self, blockchain: Blockchain, token_contract: PopulusContract = None):
+            self.creator = blockchain.web3.eth.accounts[0]
+
+            if not token_contract:
                 token_contract, txhash = blockchain.chain.provider.deploy_contract(
                                    self.token_name,
                                    deploy_args=[self.premine, self.saturation],
-                                   deploy_transaction={'from': creator})
+                                   deploy_transaction={'from': self.creator})
 
                 if txhash:
                     blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
@@ -25,12 +28,16 @@ class NuCypherKMSToken:
         class_name = self.__class__.__name__
         return "{}(blockchain={})".format(class_name, self.blockchain)
 
+    def __eq__(self, other):
+        return self.contract.address == other.contract.address
+
     def __call__(self, *args, **kwargs):
         """Invoke contract -> No state change"""
         return self.contract.call(*args, **kwargs)
 
-    def __eq__(self, other):
-        return self.contract.address == other.contract.address
+    def transact(self, *args, **kwargs):
+        """Invoke contract -> State change"""
+        return self.contract.transact(*args, **kwargs)
 
     @classmethod
     def get(cls, blockchain):
@@ -42,21 +49,19 @@ class NuCypherKMSToken:
         """Retrieve all known addresses for this contract"""
         return self.blockchain.chain.registrar.get_contract_address(self.token_name)
 
-    def transact(self, *args, **kwargs):
-        """Invoke contract -> State change"""
-        return self.contract.transact(*args, **kwargs)
-
     def balance(self, address: str):
         """Get the balance of a token address"""
         return self().balanceOf(address)
 
-    def airdrop(self, amount: int=10000):
+    def _airdrop(self, amount: int=10000) -> None:
+        """ Airdrops from creator address to others """
         creator, *addresses = self.blockchain.web3.eth.accounts
 
         def txs():
             for address in addresses:
-                yield self.transact({'from': creator}).transfer(address, amount*self.M)
+                yield self.transact({'from': self.creator}).transfer(address, amount*(10**6))
 
-        for tx_hash in txs():
-            self.blockchain.chain.wait.for_receipt(tx_hash, timeout=self.blockchain.timeout)
+        for tx in txs():
+            self.blockchain.chain.wait.for_receipt(tx, timeout=10)
 
+        return
