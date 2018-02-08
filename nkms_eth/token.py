@@ -13,13 +13,14 @@ class NuCypherKMSToken:
             self.creator = blockchain.web3.eth.accounts[0]
 
             if not token_contract:
-                token_contract, txhash = blockchain.chain.provider.deploy_contract(
+                token_contract, txhash = blockchain.chain.provider.get_or_deploy_contract(
                                    self.token_name,
                                    deploy_args=[self.premine, self.saturation],
                                    deploy_transaction={'from': self.creator})
+                if not txhash:
+                    raise Exception('Token already deployed. use .get() instead.')
 
-                if txhash:
-                    blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
+                blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
 
             self.blockchain = blockchain
             self.contract = token_contract
@@ -35,9 +36,12 @@ class NuCypherKMSToken:
         """Invoke contract -> No state change"""
         return self.contract.call(*args, **kwargs)
 
-    def transact(self, *args, **kwargs):
+    def transact(self, wait=True, *args, **kwargs):
         """Invoke contract -> State change"""
-        return self.contract.transact(*args, **kwargs)
+        tx_hash = self.contract.transact(*args, **kwargs)
+        if wait:
+            self.blockchain.chain.wait.for_receipt(tx_hash)
+        return tx_hash
 
     @classmethod
     def get(cls, blockchain):

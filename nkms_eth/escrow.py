@@ -24,10 +24,13 @@ class Escrow:
     def __init__(self, blockchain, token, contract=None):
 
         if not contract:
-            contract, txhash = blockchain.chain.provider.deploy_contract(
+            contract, txhash = blockchain.chain.provider.get_or_deploy_contract(
                 self.escrow_name,
                 deploy_args=[token.contract.address]+self.mining_coeff,
                 deploy_transaction={'from': token.creator})
+
+            if not txhash:
+                raise Exception('Escrow already deployed. use .get() instead.')
 
             blockchain.chain.wait.for_receipt(txhash, timeout=blockchain.timeout)
             txhash = token.contract.transact({'from': token.creator}).addMiner(contract.address)
