@@ -46,7 +46,7 @@ def test_mine_withdraw(testerchain, miner, token, escrow):
     for address in testerchain.web3.eth.accounts[1:]:
         miner.lock(amount=(10 + random.randrange(9000))*M, locktime=1, address=address)
 
-    testerchain.chain.wait.for_block(testerchain.web3.eth.blockNumber + 2 * escrow.hours_per_period)
+    testerchain.wait_time(escrow.hours_per_period*2)
 
     miner.mine(addr)
     miner.withdraw(addr)

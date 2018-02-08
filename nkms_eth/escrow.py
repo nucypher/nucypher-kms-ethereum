@@ -64,9 +64,13 @@ class Escrow:
         The returned addresses are shuffled, so one can request more than needed and
         throw away those which do not respond.
         """
+
         system_random = SystemRandom()
         n_select = round(quantity*additional_ursulas)            # Select more Ursulas
         n_tokens = self().getAllLockedTokens()
+
+        if not n_tokens:
+            raise Blockchain.NotEnoughUrsulas('Not enough Ursulas.')
 
         for _ in range(attempts):  # number of tries
             points = [0] + sorted(system_random.randrange(n_tokens) for _ in range(n_select))
