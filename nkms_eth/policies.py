@@ -4,18 +4,22 @@ from nkms_eth.blockchain import Blockchain
 from nkms_eth.escrow import Escrow
 from nkms_eth.token import NuCypherKMSToken
 
-from collections import namedtuple
-
-
-Policy = namedtuple('Policy', 'policy_id client miner_addr rate duration')
 
 class Policy:
-    def __init__(self, policy_id, client_addr, miner_addr, rate, duration):
+    def __init__(self, policy_id: bytes, client_addr: str, node_addr: str,
+                 value: int, gas_price: int, duration: int):
         self._policy_id = policy_id
         self.client_address = client_addr
-        self.node_address = miner_addr
-        self.rate = rate
+        self.node_address = node_addr
+        self.value = value
+        self.gas_price = gas_price
         self.duration = duration
+
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        r = "{}(client={}, node={})"
+        r = r.format(class_name, self.client_address, self.node_address)
+        return r
 
 
 class PolicyManager:
@@ -29,6 +33,8 @@ class PolicyManager:
         self.blockchain = blockchain
         self.token = token
         self.escrow = escrow    # TODO: must be deployed
+
+        self._policies = []
         self.armed = False
         self.__contract = None
 
@@ -36,7 +42,7 @@ class PolicyManager:
         self.armed = True
 
     def deploy(self) -> Tuple[str, str]:
-        if not self.armed:
+        if self.armed is False:
             raise PolicyManager.ContractDeploymentError('Contract not armed')
         if self.__contract is not None:
             raise PolicyManager.ContractDeploymentError
@@ -44,7 +50,7 @@ class PolicyManager:
         # Creator deploys the policy manager
         the_policy_manager_contract, deploy_txhash = self.blockchain._chain.provider.deploy_contract(
             self.__contract_name,
-            deploy_args=[self.token.contract.address, self.escrow.contract.address],
+            deploy_args=[self.escrow.contract.address],
             deploy_transaction={'from': self.token.creator})
 
         self.__contract = the_policy_manager_contract
@@ -66,16 +72,22 @@ class PolicyManager:
         return self.__contract.transact(*args)
 
     def create_policy(self, policy_id: bytes, client_addr: str,
-                      node_addr: str, rate: int, duration: int) -> Policy:
+                      node_addr: str, duration: int,
+                      value: int, gas_price: int) -> Policy:
 
-        txhash = self.transact({'from': client_addr}).createPolicy(policy_id,
-                                                                   client_addr,
-                                                                   node_addr,
-                                                                   rate,
-                                                                   duration)
+        payload = {'from': client_addr,
+                   'value': value,
+                   'gas_price': gas_price}
+
+        txhash = self.transact(payload).createPolicy(policy_id,
+                                                     node_addr,
+                                                     duration)
+
         self.blockchain._chain.wait.for_receipt(txhash)
 
-        policy = Policy(policy_id, client_addr, node_addr, rate, duration)
+        policy = Policy(policy_id, client_addr, node_addr, duration)
+        self._policies.append(policy)    # Track this policies
+
         return policy
 
     def get_policy(self, policy_id: bytes) -> Policy:
