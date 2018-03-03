@@ -20,7 +20,7 @@ class Escrow:
     """
 
     _contract_name = 'MinersEscrow'
-    hours_per_period = 1       # 24 Hours
+    hours_per_period = 1       # 24 Hours    TODO
     min_release_periods = 1    # 30 Periods
     max_awarded_periods = 365  # Periods
     min_allowed_locked = 10 ** 6
@@ -139,17 +139,17 @@ class Escrow:
         The returned addresses are shuffled, so one can request more than needed and
         throw away those which do not respond.
 
-                     _start
-                v
-      |-------->*--------------->*---->*------------->|
-                |                      ^
-                |                      stop
-                |
-                |       _delta
-                |---------------------------->|
-                |
-                |                       shift
-                |                      |----->|
+                  _start
+                  v
+        |-------->*--------------->*---->*------------->|
+                  |                      ^
+                  |                      stop
+                  |
+                  |       _delta
+                  |---------------------------->|
+                  |
+                  |                       shift
+                  |                      |----->|
 
         See full diagram here: https://github.com/nucypher/kms-whitepaper/blob/master/pdf/miners-ruler.pdf
 
