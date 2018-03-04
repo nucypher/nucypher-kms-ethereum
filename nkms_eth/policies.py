@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Tuple, List
 
 from nkms_eth.blockchain import Blockchain
@@ -5,21 +6,66 @@ from nkms_eth.escrow import Escrow
 from nkms_eth.token import NuCypherKMSToken
 
 
-class NetworkPolicy:
-    def __init__(self, policy_id: bytes, client_addr: str, node_addr: str,
-                 value: int, gas_price: int, duration: int):
-        self._policy_id = policy_id
-        self.client_address = client_addr
-        self.node_address = node_addr
+class PolicyArrangement:
+    def __init__(self, author: 'PolicyAuthor', delegate_address: str, value: int=None,
+                 periods: int=None, rate: int=None, arrangement_id: bytes=None):
+
+        if arrangement_id is None:
+            self.id = self.__class__._generate_arrangement_id()  # TODO: Generate policy ID
+
+        # The relationship between two addresses
+        self.author = author
+        self.policy_manager = author.policy_manager
+
+        self.delegate_address = delegate_address
+
+        # Arrangement value, rate, and duration
+        if (value and periods) and (not rate):
+            rate = value // periods
+        self._rate = rate
         self.value = value
-        self.gas_price = gas_price
-        self.duration = duration
+        self.periods = periods  # TODO: datetime -> duration in blocks
+
+        self.is_published = False
+        self._elapsed_periods = None
+        self.publish_transaction = None    # TX hashes set when published to network
+        self.revoke_transaction = None
+
+    @staticmethod
+    def _generate_arrangement_id(policy_hrac: bytes) -> bytes:
+        pass  # TODO
 
     def __repr__(self):
         class_name = self.__class__.__name__
         r = "{}(client={}, node={})"
-        r = r.format(class_name, self.client_address, self.node_address)
+        r = r.format(class_name, self.author.address, self.delegate_address)
         return r
+
+    def publish(self, gas_price: int) -> str:
+
+        payload = {'from': self.author.address,
+                   'value': self.value,
+                   'gas_price': gas_price}
+
+        txhash = self.policy_manager.transact(payload).createPolicy(self.id,
+                                                                    self.delegate_address,
+                                                                    self.periods)
+
+        self.policy_manager.blockchain._chain.wait.for_receipt(txhash)
+        self.publish_transaction = txhash
+        self.is_published = True
+        return txhash
+
+    def __update_periods(self) -> None:
+        blockchain_record = self.policy_manager.fetch_arrangement_data(self.id)
+        client, delegate, rate, *periods = blockchain_record
+        self._elapsed_periods = periods
+
+    def revoke(self, gas_price: int) -> str:
+        """Revoke this arrangement and return the transaction hash as hex."""
+        txhash = self.policy_manager.revoke_arrangement(self.id, author=self.author, gas_price=gas_price)
+        self.revoke_transaction = txhash
+        return txhash
 
 
 class PolicyManager:
@@ -32,24 +78,27 @@ class PolicyManager:
     def __init__(self, blockchain: Blockchain, token: NuCypherKMSToken, escrow: Escrow):
         self.blockchain = blockchain
         self.token = token
-        self.escrow = escrow    # TODO: must be deployed
+        self.escrow = escrow
 
-        self._policies = {}
         self.armed = False
         self.__contract = None
 
     @property
     def is_deployed(self):
-        return bool(self.__contract)
+        return bool(self.__contract is not None)
 
     def arm(self) -> None:
         self.armed = True
 
     def deploy(self) -> Tuple[str, str]:
         if self.armed is False:
-            raise PolicyManager.ContractDeploymentError('Contract not armed')
+            raise PolicyManager.ContractDeploymentError('PolicyManager contract not armed')
         if self.is_deployed is True:
-            raise PolicyManager.ContractDeploymentError
+            raise PolicyManager.ContractDeploymentError('PolicyManager contract already deployed')
+        if self.escrow.contract is None:
+            raise Escrow.ContractDeploymentError('Escrow contract must be deployed before')
+        if self.token.contract is None:
+            raise NuCypherKMSToken.ContractDeploymentError('Token contract must be deployed before')
 
         # Creator deploys the policy manager
         the_policy_manager_contract, deploy_txhash = self.blockchain._chain.provider.deploy_contract(
@@ -64,6 +113,9 @@ class PolicyManager:
 
         return deploy_txhash, set_txhash
 
+    def __call__(self, *args, **kwargs):
+        return self.__contract.call()
+
     @classmethod
     def get(cls, blockchain: Blockchain, token: NuCypherKMSToken) -> 'PolicyManager':
         contract = blockchain._chain.provider.get_contract(cls.__contract_name)
@@ -75,31 +127,18 @@ class PolicyManager:
         """Transmit a network transaction."""
         return self.__contract.transact(*args)
 
-    def publish_policy(self, hrac: str, client_addr: str,
-                      miner_addr: str, duration: int,
-                      value: int, gas_price: int) -> NetworkPolicy:
+    def fetch_arrangement_data(self, arrangement_id: bytes) -> list:
+        blockchain_record = self.__call__().policies(arrangement_id)
+        return blockchain_record
 
-        payload = {'from': client_addr,
-                   'value': value,
-                   'gas_price': gas_price}
-
-        txhash = self.transact(payload).createPolicy(hrac,
-                                                     miner_addr,
-                                                     duration)
-
+    def revoke_arrangement(self, arrangement_id: bytes, author: 'PolicyAuthor', gas_price: int):
+        """
+        Revoke by arrangement ID.
+        Only the policy author can revoke the policy
+        """
+        txhash = self.transact({'from': author.address, 'gas_price': gas_price}).revokePolicy(arrangement_id)
         self.blockchain._chain.wait.for_receipt(txhash)
-
-        policy = NetworkPolicy(hrac, client_addr, miner_addr, duration)
-        self._policies.update({hrac: policy})    # Track this policies
-
-        return policy
-
-    def fetch_policy(self, policy_id: bytes) -> NetworkPolicy:
-        client_addr, node_addr, rate, *periods = self.__contract.call().policies(policy_id)
-        policy = NetworkPolicy(policy_id, client_addr, node_addr, rate, duration=len(periods))
-        return policy
-
-    def
+        return txhash
 
 
 class PolicyAuthor:
@@ -109,39 +148,49 @@ class PolicyAuthor:
             raise PolicyManager.ContractDeploymentError('PolicyManager contract not deployed.')
         self.policy_manager = policy_manager
 
-        self.policies = dict()
-        try:
-            # Check for existing records for this address
-            self.policies = self.policy_manager._policies[address]
-        except KeyError:
-            # Otherwise create a new record for this address
-            self.policy_manager._policies[address] = self.policies
-
         if isinstance(address, bytes):
             address = address.hex()
         self.address = address
 
-    def create_policy(self, hrac: bytes, miner: str, duration: int,
-                      value: int, gas_price: int) -> NetworkPolicy:
+        self._arrangements = OrderedDict()    # Track authored policies by id
 
-        if isinstance(hrac, bytes):
-            hrac = hrac.hex()
+    def make_arrangement(self, delegate: str, periods: int, rate: int, arrangement_id: bytes=None) -> PolicyArrangement:
+        """
+        Create a new arrangement to carry out a blockchain policy for the specified rate and time.
+        """
 
-        policy = self.policy_manager.publish_policy(hrac, self.address,
-                                                    miner, duration,
-                                                    value, gas_price)
-        self.policies[hrac] = policy
-        return policy
+        value = rate * periods
+        arrangement = PolicyArrangement(author=self,
+                                        delegate_address=delegate,
+                                        value=value,
+                                        periods=periods)
 
-    def revoke_policy(self, hrac):
+        self._arrangements[arrangement.id] = {arrangement_id: arrangement}
+        return arrangement
+
+    def get_arrangement(self, arrangement_id: bytes) -> PolicyArrangement:
+        """Fetch a published arrangement from the blockchain"""
+
+        blockchain_record = self.policy_manager().policies(arrangement_id)
+        client, delegate, rate, *periods = blockchain_record
+
+        arrangement = PolicyArrangement(author=self, delegate_address=delegate, rate=rate)
+
+        arrangement._elapsed_periods = periods
+        arrangement.is_published = True
+        return arrangement
+
+    def revoke_arrangement(self, arrangement_id):
+        """Lookup the arrangement in the cache and revoke it on the blockchain"""
         try:
-            policy = self.policies[hrac]
+            arrangement = self._arrangements[arrangement_id]
         except KeyError:
-            raise Exception('No such policy')
+            raise Exception('No such arrangement')
         else:
-            self.policy_manager.revoke(hrac)
+            txhash = arrangement.revoke()
+        return txhash
 
-    def select_ursulas(self, quantity: int) -> List[str]:
-        ursulas = self.policy_manager.escrow.sample(quantity=quantity)
-        return ursulas
+    def select_miners(self, quantity: int) -> List[str]:
+        miner_addresses = self.policy_manager.escrow.sample(quantity=quantity)
+        return miner_addresses
 
