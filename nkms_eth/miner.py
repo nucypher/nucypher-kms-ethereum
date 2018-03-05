@@ -1,9 +1,6 @@
 from typing import Tuple
 
-from nkms_eth.policies import PolicyManager
-from .blockchain import Blockchain
 from .escrow import Escrow
-from .token import NuCypherKMSToken
 
 
 class Miner:
@@ -17,18 +14,17 @@ class Miner:
 
     """
 
-    def __init__(self, blockchain: Blockchain, token: NuCypherKMSToken,
-                 escrow: Escrow, policy_manager: PolicyManager, address=None):
-        self.blockchain = blockchain
-        self.token = token
+    def __init__(self, escrow: Escrow, address=None):
 
         self.escrow = escrow
-        if not escrow.contract:
+        if not escrow._contract:
             raise Escrow.ContractDeploymentError('Escrow contract not deployed. Arm then deploy.')
         else:
             escrow.miners.append(self)
 
-        self.policy_manager = policy_manager
+        self._token = escrow.token
+        self._blockchain = self._token.blockchain
+
         self.address = address
 
     def __repr__(self):
