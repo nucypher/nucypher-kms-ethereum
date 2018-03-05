@@ -75,10 +75,10 @@ class PolicyManager:
     class ContractDeploymentError(Exception):
         pass
 
-    def __init__(self, blockchain: Blockchain, token: NuCypherKMSToken, escrow: Escrow):
-        self.blockchain = blockchain
-        self.token = token
+    def __init__(self, escrow: Escrow):
         self.escrow = escrow
+        self.token = escrow.token
+        self.blockchain = self.token.blockchain
 
         self.armed = False
         self.__contract = None
@@ -95,7 +95,7 @@ class PolicyManager:
             raise PolicyManager.ContractDeploymentError('PolicyManager contract not armed')
         if self.is_deployed is True:
             raise PolicyManager.ContractDeploymentError('PolicyManager contract already deployed')
-        if self.escrow.contract is None:
+        if self.escrow._contract is None:
             raise Escrow.ContractDeploymentError('Escrow contract must be deployed before')
         if self.token.contract is None:
             raise NuCypherKMSToken.ContractDeploymentError('Token contract must be deployed before')
@@ -103,7 +103,7 @@ class PolicyManager:
         # Creator deploys the policy manager
         the_policy_manager_contract, deploy_txhash = self.blockchain._chain.provider.deploy_contract(
             self.__contract_name,
-            deploy_args=[self.escrow.contract.address],
+            deploy_args=[self.escrow._contract.address],
             deploy_transaction={'from': self.token.creator})
 
         self.__contract = the_policy_manager_contract
@@ -117,9 +117,9 @@ class PolicyManager:
         return self.__contract.call()
 
     @classmethod
-    def get(cls, blockchain: Blockchain, token: NuCypherKMSToken) -> 'PolicyManager':
-        contract = blockchain._chain.provider.get_contract(cls.__contract_name)
-        instance = cls(blockchain=blockchain, token=token)
+    def get(cls, escrow: Escrow) -> 'PolicyManager':
+        contract = escrow.blockchain._chain.provider.get_contract(cls.__contract_name)
+        instance = cls(escrow)
         instance.__contract = contract
         return instance
 
