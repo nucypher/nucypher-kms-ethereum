@@ -45,10 +45,11 @@ def test_create_escrow(testerchain):
 
 def test_get_swarm(testerchain, token, escrow):
     token._airdrop(amount=10000)
+    creator, *addresses = testerchain._chain.web3.eth.accounts
 
     # Create 9 Miners
-    for u in testerchain._chain.web3.eth.accounts[1:]:
-        miner = Miner(escrow=escrow, address=u)
+    for address in addresses:
+        miner = Miner(escrow=escrow, address=address)
         amount = (10+random.randrange(9000)) * M
         miner.lock(amount=amount, locktime=1)
 

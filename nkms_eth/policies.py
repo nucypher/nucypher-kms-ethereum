@@ -81,11 +81,11 @@ class PolicyManager:
         self.blockchain = self.token.blockchain
 
         self.armed = False
-        self.__contract = None
+        self._contract = None
 
     @property
     def is_deployed(self):
-        return bool(self.__contract is not None)
+        return bool(self._contract is not None)
 
     def arm(self) -> None:
         self.armed = True
@@ -106,7 +106,7 @@ class PolicyManager:
             deploy_args=[self.escrow._contract.address],
             deploy_transaction={'from': self.token.creator})
 
-        self.__contract = the_policy_manager_contract
+        self._contract = the_policy_manager_contract
 
         set_txhash = self.escrow.transact({'from': self.token.creator}).setPolicyManager(the_policy_manager_contract.address)
         self.blockchain._chain.wait.for_receipt(set_txhash)
@@ -114,18 +114,18 @@ class PolicyManager:
         return deploy_txhash, set_txhash
 
     def __call__(self, *args, **kwargs):
-        return self.__contract.call()
+        return self._contract.call()
 
     @classmethod
     def get(cls, escrow: Escrow) -> 'PolicyManager':
         contract = escrow.blockchain._chain.provider.get_contract(cls.__contract_name)
         instance = cls(escrow)
-        instance.__contract = contract
+        instance._contract = contract
         return instance
 
     def transact(self, *args):
         """Transmit a network transaction."""
-        return self.__contract.transact(*args)
+        return self._contract.transact(*args)
 
     def fetch_arrangement_data(self, arrangement_id: bytes) -> list:
         blockchain_record = self.__call__().policies(arrangement_id)

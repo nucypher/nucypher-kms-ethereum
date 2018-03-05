@@ -38,7 +38,7 @@ def test_mine_withdraw(testerchain, token, escrow):
     testerchain.wait_time(escrow.hours_per_period*2)
 
     ursula.mint()
-    ursula.withdraw()
+    ursula.withdraw(entire_balance=True)
     final_balance = token.balance(ursula.address)
 
     assert final_balance > initial_balance
@@ -50,7 +50,7 @@ def test_publish_miner_id(testerchain, token, escrow):
     miner_addr = testerchain._chain.web3.eth.accounts[1]
     miner = Miner(escrow=escrow, address=miner_addr)
 
-    balance = miner.balance()
+    balance = miner.token_balance()
     miner.lock(amount=balance, locktime=1)
 
     # Publish Miner IDs to the DHT

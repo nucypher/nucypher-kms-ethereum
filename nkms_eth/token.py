@@ -25,7 +25,7 @@ class NuCypherKMSToken:
 
     def __eq__(self, other):
         """Two token objects are equal if they have the same contract address"""
-        return self._contract.address == other.contract.address
+        return self._contract.address == other._contract.address
 
     def __call__(self, *args, **kwargs):
         """Invoke contract -> No state change"""
