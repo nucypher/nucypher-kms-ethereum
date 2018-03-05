@@ -26,6 +26,8 @@ class Miner:
         self._blockchain = self._token.blockchain
 
         self.address = address
+        self._transactions = []
+        self._locked_tokens = self._update_locked_tokens()
 
     def __repr__(self):
         class_name = self.__class__.__name__
@@ -37,11 +39,16 @@ class Miner:
         """Removes this miner from the escrow's list of miners on delete."""
         self.escrow.miners.remove(self)
 
+    def _update_locked_tokens(self) -> None:
+        self._locked_tokens = self.escrow().getLockedTokens(self.address)
+
     def _approve_escrow(self, amount: int) -> str:
         """Approve the transfer of token from the miner's address to the escrow contract."""
 
-        txhash = self.token.transact({'from': self.address}).approve(self.escrow.contract.address, amount)
-        self.blockchain._chain.wait.for_receipt(txhash, timeout=self.blockchain._timeout)
+        txhash = self._token.transact({'from': self.address}).approve(self.escrow._contract.address, amount)
+        self._blockchain._chain.wait.for_receipt(txhash, timeout=self._blockchain._timeout)
+
+        self._transactions.append(txhash)
 
         return txhash
 
@@ -49,7 +56,9 @@ class Miner:
         """Send tokes to the escrow from the miner's address"""
 
         deposit_txhash = self.escrow.transact({'from': self.address}).deposit(amount, locktime)
-        self.blockchain._chain.wait.for_receipt(deposit_txhash, timeout=self.blockchain._timeout)
+        self._blockchain._chain.wait.for_receipt(deposit_txhash, timeout=self._blockchain._timeout)
+
+        self._transactions.append(deposit_txhash)
 
         return deposit_txhash
 
@@ -60,23 +69,39 @@ class Miner:
         deposit_txhash = self._send_tokens_to_escrow(amount=amount, locktime=locktime)
 
         lock_txhash = self.escrow.transact({'from': self.address}).switchLock()
-        self.blockchain._chain.wait.for_receipt(lock_txhash, timeout=self.blockchain._timeout)
+        self._blockchain._chain.wait.for_receipt(lock_txhash, timeout=self._blockchain._timeout)
+
+        self._transactions.extend([approve_txhash, deposit_txhash, lock_txhash])
 
         return approve_txhash, deposit_txhash, lock_txhash
+
+    def confirm_activity(self) -> str:
+        """Miner rewarded for every confirmed period"""
+
+        txhash = self.escrow._contract.transact({'from': self.address}).confirmActivity()
+        self._blockchain._chain.wait.for_receipt(txhash)
+
+        self._transactions.append(txhash)
+
+        return txhash
 
     def mint(self) -> str:
         """Computes and transfers tokens to the miner's account"""
 
         txhash = self.escrow.transact({'from': self.address}).mint()
-        self.blockchain._chain.wait.for_receipt(txhash, timeout=self.blockchain._timeout)
+        self._blockchain._chain.wait.for_receipt(txhash, timeout=self._blockchain._timeout)
+
+        self._transactions.append(txhash)
 
         return txhash
 
-    def collect_reward(self):
-        """Collect policy reward"""
+    def collect_policy_reward(self, policy_manager):
+        """Collect policy reward in ETH"""
 
-        txhash = self.policy_manager.transact({'from': self.address}).withdraw()
-        self.blockchain._chain.wait.for_receipt(txhash)
+        txhash = policy_manager.transact({'from': self.address}).withdraw()
+        self._blockchain._chain.wait.for_receipt(txhash)
+
+        self._transactions.append(txhash)
 
         return txhash
 
@@ -84,7 +109,9 @@ class Miner:
         """Store a new Miner ID"""
 
         txhash = self.escrow.transact({'from': self.address}).setMinerId(miner_id)
-        self.blockchain._chain.wait.for_receipt(txhash)
+        self._blockchain._chain.wait.for_receipt(txhash)
+
+        self._transactions.append(txhash)
 
         return txhash
 
