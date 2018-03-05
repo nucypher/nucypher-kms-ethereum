@@ -128,18 +128,28 @@ class Miner:
 
         return tuple(miner_ids)
 
-    def confirm_activity(self) -> str:
-        """Miner rewarded for every confirmed period"""
+    def eth_balance(self):
+        return self.escrow.blockchain._chain.web3.eth.getBalance(self.address)
 
-        txhash = self.escrow.contract.transact({'from': self.address}).confirmActivity()
-        self.blockchain._chain.wait.for_receipt(txhash)
+    def token_balance(self) -> int:
+        """Check miner's current token balance"""
 
-        return txhash
-
-    def balance(self) -> int:
-        """Check miner's current balance"""
-
-        self.token._check_contract_deployment()
-        balance = self.token().balanceOf(self.address)
+        self._token._check_contract_deployment()
+        balance = self._token().balanceOf(self.address)
 
         return balance
+
+    def withdraw(self, amount: int, entire_balance=False) -> str:
+        """Withdraw tokens"""
+
+        if entire_balance and amount:
+            raise Exception("Specify an amount or entire balance, not both")
+        elif entire_balance:
+            txhash = self.escrow.transact({'from': self.address}).withdraw(amount)
+        else:
+            txhash = self.escrow.transact({'from': self.address}).withdrawAll()
+
+        self._transactions.append(txhash)
+        self._blockchain.chain.wait.for_receipt(txhash, timeout=self._blockchain.timeout)
+
+        return txhash
