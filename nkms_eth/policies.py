@@ -154,14 +154,14 @@ class PolicyAuthor:
 
         self._arrangements = OrderedDict()    # Track authored policies by id
 
-    def make_arrangement(self, delegate: str, periods: int, rate: int, arrangement_id: bytes=None) -> PolicyArrangement:
+    def make_arrangement(self, miner: Miner, periods: int, rate: int, arrangement_id: bytes=None) -> PolicyArrangement:
         """
         Create a new arrangement to carry out a blockchain policy for the specified rate and time.
         """
 
         value = rate * periods
         arrangement = PolicyArrangement(author=self,
-                                        delegate_address=delegate,
+                                        miner=miner,
                                         value=value,
                                         periods=periods)
 
@@ -172,9 +172,10 @@ class PolicyAuthor:
         """Fetch a published arrangement from the blockchain"""
 
         blockchain_record = self.policy_manager().policies(arrangement_id)
-        client, delegate, rate, *periods = blockchain_record
+        author_address, miner_address, rate, *periods = blockchain_record
 
-        arrangement = PolicyArrangement(author=self, delegate_address=delegate, rate=rate)
+        miner = Miner.from_address(miner_address)
+        arrangement = PolicyArrangement(author=self, miner=miner, rate=rate)
 
         arrangement._elapsed_periods = periods
         arrangement.is_published = True
@@ -194,3 +195,5 @@ class PolicyAuthor:
         miner_addresses = self.policy_manager.escrow.sample(quantity=quantity)
         return miner_addresses
 
+    def balance(self):
+        return self.policy_manager.token().balanceOf(self.address)
