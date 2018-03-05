@@ -24,8 +24,8 @@ def test_create_escrow(testerchain):
         same_token.arm()
         same_token.deploy()
 
-    assert len(token.contract.address) == 42
-    assert token.contract.address == same_token.contract.address
+    assert len(token._contract.address) == 42
+    assert token._contract.address == same_token._contract.address
 
     with raises(NoKnownAddress):
         Escrow.get(blockchain=testerchain, token=token)
@@ -39,8 +39,8 @@ def test_create_escrow(testerchain):
         same_escrow.arm()
         same_escrow.deploy()
 
-    assert len(escrow.contract.address) == 42
-    assert escrow.contract.address == same_escrow.contract.address
+    assert len(escrow._contract.address) == 42
+    assert escrow._contract.address == same_escrow._contract.address
 
 
 def test_get_swarm(testerchain, token, escrow):
@@ -48,7 +48,7 @@ def test_get_swarm(testerchain, token, escrow):
 
     # Create 9 Miners
     for u in testerchain._chain.web3.eth.accounts[1:]:
-        miner = Miner(blockchain=testerchain, token=token, escrow=escrow, address=u)
+        miner = Miner(escrow=escrow, address=u)
         amount = (10+random.randrange(9000)) * M
         miner.lock(amount=amount, locktime=1)
 
