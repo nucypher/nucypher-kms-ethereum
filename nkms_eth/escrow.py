@@ -24,8 +24,8 @@ class MinerEscrow:
     min_release_periods = 1    # 30 Periods
     max_awarded_periods = 365  # Periods
     min_allowed_locked = 10 ** 6
-    max_allowed_locked = 10 ** 7 * NuCypherKMSToken.M
-    reward = NuCypherKMSToken.saturation - NuCypherKMSToken.premine
+    max_allowed_locked = 10 ** 7 * NuCypherKMSToken._M
+    reward = NuCypherKMSToken._reward
     null_addr = '0x' + '0' * 40
 
     mining_coeff = [
@@ -44,11 +44,13 @@ class MinerEscrow:
     class NotEnoughUrsulas(Exception):
         pass
 
-    def __init__(self, blockchain: Blockchain, token: NuCypherKMSToken, contract: PopulusContract=None):
-        self.blockchain = blockchain
-        self._contract = contract
-        self.token = token
-        self.armed = False
+    def __init__(self, token: NuCypherKMSToken):
+        self._token = token
+        self._blockchain = token._blockchain
+
+        self._armed = False
+        self._contract = None
+
         self.miners = list()
 
     def __call__(self):
@@ -60,7 +62,10 @@ class MinerEscrow:
         return self._contract.address == other._contract.address
 
     def arm(self) -> None:
-        self.armed = True
+        if self._token._contract is None:
+            raise NuCypherKMSToken.ContractDeploymentError('Token contract must be deployed before')
+        else:
+            self._armed = True
 
     def deploy(self) -> Tuple[str, str, str]:
         """
@@ -73,7 +78,7 @@ class MinerEscrow:
         Returns transaction hashes in a tuple: deploy, reward, and initialize.
         """
 
-        if self.armed is False:
+        if self._armed is False:
             raise self.ContractDeploymentError('use .arm() to arm the contract, then .deploy().')
 
         if self._contract is not None:
@@ -81,29 +86,31 @@ class MinerEscrow:
             message = '{} contract already deployed, use .get() to retrieve it.'.format(class_name)
             raise self.ContractDeploymentError(message)
 
-        the_escrow_contract, deploy_txhash = self.blockchain._chain.provider.deploy_contract(self._contract_name,
-                                                                                             deploy_args=[self.token._contract.address] + self.mining_coeff,
-                                                                                             deploy_transaction={'from': self.token.creator})
+        the_escrow_contract, deploy_txhash = self._blockchain._chain.provider.deploy_contract(self._contract_name,
+                                                                                              deploy_args=[self._token._contract.address] + self.mining_coeff,
+                                                                                              deploy_transaction={'from': self._token._creator})
 
-        self.blockchain._chain.wait.for_receipt(deploy_txhash, timeout=self.blockchain._timeout)
+        self._blockchain._chain.wait.for_receipt(deploy_txhash, timeout=self._blockchain._timeout)
         self._contract = the_escrow_contract
 
-        reward_txhash = self.token.transact({'from': self.token.creator}).transfer(self._contract.address, self.reward)
-        self.blockchain._chain.wait.for_receipt(reward_txhash, timeout=self.blockchain._timeout)
+        reward_txhash = self._token.transact({'from': self._token._creator}).transfer(self._contract.address, self.reward)
+        self._blockchain._chain.wait.for_receipt(reward_txhash, timeout=self._blockchain._timeout)
 
-        init_txhash = self._contract.transact({'from': self.token.creator}).initialize()
-        self.blockchain._chain.wait.for_receipt(init_txhash, timeout=self.blockchain._timeout)
+        init_txhash = self._contract.transact({'from': self._token._creator}).initialize()
+        self._blockchain._chain.wait.for_receipt(init_txhash, timeout=self._blockchain._timeout)
 
         return deploy_txhash, reward_txhash, init_txhash
 
     @classmethod
-    def get(cls, blockchain, token) -> 'MinerEscrow':
+    def get(cls, token: NuCypherKMSToken) -> 'MinerEscrow':
         """
         Returns the Escrow object,
         or raises UnknownContract if the contract has not been deployed.
         """
-        contract = blockchain._chain.provider.get_contract(cls._contract_name)
-        return cls(blockchain=blockchain, token=token, contract=contract)
+        contract = token._blockchain._chain.provider.get_contract(cls._contract_name)
+        instance = cls(token=token)
+        instance._contract = contract
+        return instance
 
     def transact(self, *args, **kwargs):
         if self._contract is None:

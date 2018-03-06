@@ -4,24 +4,26 @@ from .blockchain import Blockchain
 
 class NuCypherKMSToken:
     __contract_name = 'NuCypherKMSToken'
-    subdigits = 18
-    M = 10 ** subdigits
-    premine = int(1e9) * M
-    saturation = int(1e10) * M
+    __subdigits = 18
+    _M = 10 ** __subdigits
+    __premine = int(1e9) * _M
+    __saturation = int(1e10) * _M
+    _reward = __saturation - __premine
+
 
     class ContractDeploymentError(Exception):
         pass
 
-    def __init__(self, blockchain: Blockchain, token_contract: PopulusContract=None):
-        self.creator = blockchain._chain.web3.eth.accounts[0]
-        self.blockchain = blockchain
-        self._contract = token_contract
-        self.armed = False
+    def __init__(self, blockchain: Blockchain):
+        self._creator = blockchain._chain.web3.eth.accounts[0]
+        self._blockchain = blockchain
+        self._contract = None
+        self._armed = False
 
     def __repr__(self):
         class_name = self.__class__.__name__
         r = "{}(blockchain={}, contract={})"
-        return r.format(class_name, self.blockchain, self._contract)
+        return r.format(class_name, self._blockchain, self._contract)
 
     def __eq__(self, other):
         """Two token objects are equal if they have the same contract address"""
@@ -40,7 +42,7 @@ class NuCypherKMSToken:
 
     def arm(self) -> None:
         """Arm contract for deployment to blockchain."""
-        self.armed = True
+        self._armed = True
 
     def deploy(self) -> str:
         """
@@ -51,7 +53,7 @@ class NuCypherKMSToken:
         Deployment can only ever be executed exactly once!
         """
 
-        if self.armed is False:
+        if self._armed is False:
             raise self.ContractDeploymentError('use .arm() to arm the contract, then .deploy().')
 
         if self._contract is not None:
@@ -59,12 +61,12 @@ class NuCypherKMSToken:
             message = '{} contract already deployed, use .get() to retrieve it.'.format(class_name)
             raise self.ContractDeploymentError(message)
 
-        the_nucypherKMS_token_contract, deployment_txhash = self.blockchain._chain.provider.deploy_contract(
+        the_nucypherKMS_token_contract, deployment_txhash = self._blockchain._chain.provider.deploy_contract(
             self.__contract_name,
-            deploy_args=[self.saturation],
-            deploy_transaction={'from': self.creator})
+            deploy_args=[self.__saturation],
+            deploy_transaction={'from': self._creator})
 
-        self.blockchain._chain.wait.for_receipt(deployment_txhash, timeout=self.blockchain._timeout)
+        self._blockchain._chain.wait.for_receipt(deployment_txhash, timeout=self._blockchain._timeout)
 
         self._contract = the_nucypherKMS_token_contract
         return deployment_txhash
@@ -82,12 +84,14 @@ class NuCypherKMSToken:
         or raises UnknownContract if the contract has not been deployed.
         """
         contract = blockchain._chain.provider.get_contract(cls.__contract_name)
-        return cls(blockchain=blockchain, token_contract=contract)
+        instance = cls(blockchain=blockchain)
+        instance._contract = contract
+        return instance
 
     def registrar(self):
         """Retrieve all known addresses for this contract"""
         self._check_contract_deployment()
-        return self.blockchain._chain.registrar.get_contract_address(self.__contract_name)
+        return self._blockchain._chain.registrar.get_contract_address(self.__contract_name)
 
     def balance(self, address: str):
         """Get the balance of a token address"""
@@ -97,13 +101,13 @@ class NuCypherKMSToken:
     def _airdrop(self, amount: int):
         """Airdrops from creator address to all other addresses!"""
         self._check_contract_deployment()
-        _, *addresses = self.blockchain._chain.web3.eth.accounts
+        _, *addresses = self._blockchain._chain.web3.eth.accounts
 
         def txs():
             for address in addresses:
-                yield self.transact({'from': self.creator}).transfer(address, amount*(10**6))
+                yield self.transact({'from': self._creator}).transfer(address, amount * (10 ** 6))
 
         for tx in txs():
-            self.blockchain._chain.wait.for_receipt(tx, timeout=10)
+            self._blockchain._chain.wait.for_receipt(tx, timeout=10)
 
         return self

@@ -22,8 +22,8 @@ class Miner:
         else:
             escrow.miners.append(self)
 
-        self._token = escrow.token
-        self._blockchain = self._token.blockchain
+        self._token = escrow._token
+        self._blockchain = self._token._blockchain
 
         self.address = address
         self._transactions = []

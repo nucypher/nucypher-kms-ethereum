@@ -22,8 +22,8 @@ def token(testerchain):
 
 
 @pytest.fixture(scope='function')
-def escrow(testerchain, token):
-    escrow = MockMinerEscrow(blockchain=testerchain, token=token)
+def escrow(token):
+    escrow = MockMinerEscrow(token=token)
     escrow.arm()
     escrow.deploy()
     yield escrow

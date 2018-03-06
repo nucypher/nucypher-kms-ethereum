@@ -75,7 +75,7 @@ class PolicyManager:
 
     def __init__(self, escrow: MinerEscrow):
         self.escrow = escrow
-        self.token = escrow.token
+        self.token = escrow._token
         self.blockchain = self.token.blockchain
 
         self.armed = False
@@ -86,17 +86,17 @@ class PolicyManager:
         return bool(self._contract is not None)
 
     def arm(self) -> None:
-        self.armed = True
+        """Ensure the escrow is deployed and arm this contract"""
+        if self.escrow._contract is None:
+            raise MinerEscrow.ContractDeploymentError('Escrow contract must be deployed before')
+        else:
+            self.armed = True
 
     def deploy(self) -> Tuple[str, str]:
         if self.armed is False:
             raise PolicyManager.ContractDeploymentError('PolicyManager contract not armed')
         if self.is_deployed is True:
             raise PolicyManager.ContractDeploymentError('PolicyManager contract already deployed')
-        if self.escrow._contract is None:
-            raise MinerEscrow.ContractDeploymentError('Escrow contract must be deployed before')
-        if self.token.contract is None:
-            raise NuCypherKMSToken.ContractDeploymentError('Token contract must be deployed before')
 
         # Creator deploys the policy manager
         the_policy_manager_contract, deploy_txhash = self.blockchain._chain.provider.deploy_contract(
@@ -116,7 +116,7 @@ class PolicyManager:
 
     @classmethod
     def get(cls, escrow: MinerEscrow) -> 'PolicyManager':
-        contract = escrow.blockchain._chain.provider.get_contract(cls.__contract_name)
+        contract = escrow._blockchain._chain.provider.get_contract(cls.__contract_name)
         instance = cls(escrow)
         instance._contract = contract
         return instance

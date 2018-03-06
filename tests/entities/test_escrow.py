@@ -28,13 +28,13 @@ def test_create_escrow(testerchain):
     assert token._contract.address == same_token._contract.address
 
     with raises(NoKnownAddress):
-        MinerEscrow.get(blockchain=testerchain, token=token)
+        MinerEscrow.get(token=token)
 
-    escrow = MinerEscrow(blockchain=testerchain, token=token)
+    escrow = MinerEscrow(token=token)
     escrow.arm()
     escrow.deploy()
 
-    same_escrow = MinerEscrow.get(blockchain=testerchain, token=token)
+    same_escrow = MinerEscrow.get(token=token)
     with raises(MinerEscrow.ContractDeploymentError):
         same_escrow.arm()
         same_escrow.deploy()
