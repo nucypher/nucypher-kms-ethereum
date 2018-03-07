@@ -15,56 +15,57 @@ class Actor(ABC):
         r.format(class_name, self.address)
         return r
 
-class ContractController(ABC):
-    """Abstract base class for contract deployers and agents"""
-    def __init__(self, blockchain: TheBlockchain):
-        self._blockchain = blockchain
 
-
-class ContractDeployer(ABC, ContractController):
+class ContractDeployer(ABC):
     __contract_name = None
 
     class ContractDeploymentError(Exception):
         pass
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, blockchain):
         self._armed = False
         self.__contract = None
-        super().__init__(*args, **kwargs)
+        self._blockchain = blockchain
 
     def __eq__(self, other):
         return self.__contract.address == other.address
 
     @property
-    def address(self):
+    def address(self) -> str:
         return self.__contract.address
 
     @property
-    def is_deployed(self):
-        return bool(self._contract is not None)
+    def is_deployed(self) -> bool:
+        return bool(self.__contract is not None)
 
     @property
     @classmethod
-    def contract_name(cls):
+    def contract_name(cls) -> str:
         return cls.__contract_name
+
+    def _verify_contract_deployment(self) -> None:
+        """Raises ContractDeploymentError if the contract has not been armed and deployed."""
+        if not self.__contract:
+            class_name = self.__class__.__name__
+            message = '{} contract is not deployed. Arm, then deploy.'.format(class_name)
+            raise self.ContractDeploymentError(message)
+        return None
 
     def arm(self) -> None:
         self._armed = True
         return None
 
     @abstractmethod
-    def deploy(self):
+    def deploy(self) -> str:
         raise NotImplementedError
 
-    def _check_contract_deployment(self) -> None:
-        """Raises ContractDeploymentError if the contract has not been armed and deployed."""
-        if not self._contract:
-            class_name = self.__class__.__name__
-            message = '{} contract is not deployed. Arm, then deploy.'.format(class_name)
-            raise self.ContractDeploymentError(message)
+    @abstractmethod
+    def make_agent(self) -> 'ContractAgent':
+        raise NotImplementedError
+
 
     # @classmethod
-    # def from_blockchain(cls, blockchain: TheBlockchain):
+    # def from_blockchain(cls, blockchain: TheBlockchain) -> 'ContractDeployer':
     #     """
     #     Returns the NuCypherKMSToken object,
     #     or raises UnknownContract if the contract has not been deployed.
@@ -85,7 +86,12 @@ class ContractAgent(ABC):
     def __init__(self, agent, *args, **kwargs):
         contract = agent._blockchain._chain.provider.get_contract(agent._contract_name)
         self._contract = contract
-        super().__init__(blockchain=agent._blockchain)
+        self._blockchain = agent._blockchain
+
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        r = "{}(blockchain={}, contract={})"
+        return r.format(class_name, self._blockchain, self._contract)
 
     def call(self):
         return self._contract.call()
