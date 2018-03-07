@@ -1,4 +1,24 @@
+import random
+from typing import Set, Generator
+
+from nkms_eth.actors import PolicyAuthor
 from nkms_eth.base import ContractAgent
+from nkms_eth.deployers import MinerEscrowDeployer, NuCypherKMSTokenDeployer, PolicyManagerDeployer
+
+
+class NuCypherKMSTokenAgent(ContractAgent):
+
+    __deployer = NuCypherKMSTokenDeployer
+    _contract_name = __deployer.contract_name
+
+    def registrar(self):
+        """Retrieve all known addresses for this contract"""
+        all_known_address = self._blockchain._chain.registrar.get_contract_address(self._contract_name)
+        return all_known_address
+
+    def check_balance(self, address: str) -> int:
+        """Get the balance of a token address"""
+        return self.call().balanceOf(address)
 
 
 class MinerAgent(ContractAgent):
@@ -10,7 +30,8 @@ class MinerAgent(ContractAgent):
     for a duration measured in periods.
 
     """
-    _contract_name = MinerEscrowDeployer.contract_name
+    __deployer = MinerEscrowDeployer
+    _contract_name = __deployer.contract_name
 
     class NotEnoughUrsulas(Exception):
         pass

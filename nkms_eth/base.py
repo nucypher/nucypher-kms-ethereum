@@ -75,7 +75,8 @@ class ContractDeployer(ABC, ContractController):
     #     return instance
 
 
-class ContractAgent(ABC, ContractController):
+class ContractAgent(ABC):
+    __deployer = None
     _contract_name = None
 
     class ContractNotDeployed(Exception):
