@@ -21,18 +21,20 @@ class MinerAgent(ContractAgent):
         self.miners = list()
 
     def get_miner_ids(self) -> Set[str]:
-        """Fetch all miner IDs and return them in a set"""
+        """
+        Fetch all miner IDs from the local cache and return them in a set
+        """
         return {miner.get_id() for miner in self.miners}
 
     def swarm(self) -> Generator[str, None, None]:
         """
-        Generates all miner addresses via cumulative sum.
+        Generates all miner addresses via cumulative sum on-network.
         """
         miner, i = MinerEscrowDeployer.null_address, 0
         while True:
 
             # Get the next miner
-            next_miner = self.__call__().getNextMiner(miner)
+            next_miner = self.call().getNextMiner(miner)
 
             if next_miner == MinerEscrowDeployer.null_address:
                 raise StopIteration()
@@ -67,7 +69,7 @@ class MinerAgent(ContractAgent):
 
         system_random = random.SystemRandom()
         n_select = round(quantity*additional_ursulas)            # Select more Ursulas
-        n_tokens = self.__call__().getAllLockedTokens()
+        n_tokens = self.call().getAllLockedTokens()
 
         if not n_tokens > 0:
             raise self.NotEnoughUrsulas('There are no locked tokens.')
@@ -78,7 +80,7 @@ class MinerAgent(ContractAgent):
 
             addrs, addr, shift = set(), MinerEscrowDeployer.null_address, 0
             for delta in deltas:
-                addr, shift = self.__call__().findCumSum(addr, delta+shift, duration)
+                addr, shift = self.call().findCumSum(addr, delta+shift, duration)
                 addrs.add(addr)
 
             if len(addrs) >= quantity:
@@ -87,11 +89,13 @@ class MinerAgent(ContractAgent):
         raise self.NotEnoughUrsulas('Selection failed after {} attempts'.format(attempts))
 
 
-
 class PolicyAgent(ContractAgent):
 
+    __deployer = PolicyManagerDeployer
+    _contract_name = __deployer.contract_name
+
     def fetch_arrangement_data(self, arrangement_id: bytes) -> list:
-        blockchain_record = self.__call__().policies(arrangement_id)
+        blockchain_record = self.call().policies(arrangement_id)
         return blockchain_record
 
     def revoke_arrangement(self, arrangement_id: bytes, author: 'PolicyAuthor', gas_price: int):
@@ -99,22 +103,5 @@ class PolicyAgent(ContractAgent):
         Revoke by arrangement ID; Only the policy author can revoke the policy
         """
         txhash = self.transact({'from': author.address, 'gas_price': gas_price}).revokePolicy(arrangement_id)
-        self.blockchain._chain.wait.for_receipt(txhash)
+        self._blockchain._chain.wait.for_receipt(txhash)
         return txhash
-
-
-class NuCypherKMSTokenAgent(ContractAgent):
-
-    def __repr__(self):
-        class_name = self.__class__.__name__
-        r = "{}(blockchain={}, contract={})"
-        return r.format(class_name, self._blockchain, self._contract)
-
-    def registrar(self):
-        """Retrieve all known addresses for this contract"""
-        all_known_address = self._blockchain._chain.registrar.get_contract_address(NuCypherKMSTokenDeployer.contract_name())
-        return all_known_address
-
-    def check_balance(self, address: str) -> int:
-        """Get the balance of a token address"""
-        return self.__call__().balanceOf(address)
