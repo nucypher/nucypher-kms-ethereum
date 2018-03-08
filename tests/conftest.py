@@ -27,8 +27,20 @@ def token_deployer(testerchain):
 
 
 @pytest.fixture(scope='function')
-def escrow(token):
-    escrow = MockMinerEscrow(token=token)
+def escrow_deployer(token_agent):
+    escrow = MockMinerEscrowDeployer(token_agent)
     escrow.arm()
     escrow.deploy()
     yield escrow
+
+
+@pytest.fixture(scope='function')
+def token_agent(testerchain):
+    token = NuCypherKMSTokenAgent(blockchain=testerchain)
+    yield token
+
+
+@pytest.fixture(scope='function')
+def miner_agent(token_agent):
+    miner_agent = MinerAgent(token_agent)
+    yield miner_agent
