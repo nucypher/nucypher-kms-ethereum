@@ -11,13 +11,8 @@ def testerchain():
     chain = TesterBlockchain()
     yield chain
     del chain
-    TesterBlockchain.__instance = None
+    TheBlockchain._TheBlockchain__instance = None
 
-
-@pytest.fixture(scope='function')
-def token_agent(testerchain):
-    token = NuCypherKMSTokenAgent(blockchain=testerchain)
-    yield token
 
 @pytest.fixture(scope='function')
 def token_deployer(testerchain):

@@ -23,7 +23,7 @@ class NuCypherKMSTokenAgent(EthereumContractAgent, deployer=NuCypherKMSTokenDepl
         return self.call().balanceOf(address)
 
 
-class MinerAgent(ContractAgent):
+class MinerAgent(EthereumContractAgent, deployer=MinerEscrowDeployer):
     """
     Wraps NuCypher's Escrow solidity smart contract, and manages a PopulusContract.
 
@@ -32,8 +32,6 @@ class MinerAgent(ContractAgent):
     for a duration measured in periods.
 
     """
-    __deployer = MinerEscrowDeployer
-    _contract_name = __deployer.contract_name
 
     class NotEnoughUrsulas(Exception):
         pass

@@ -1,3 +1,4 @@
+from abc import ABC
 from os.path import dirname, join, abspath
 
 import appdirs
