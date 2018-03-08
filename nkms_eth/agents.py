@@ -53,13 +53,13 @@ class MinerAgent(ContractAgent):
         """
         Generates all miner addresses via cumulative sum on-network.
         """
-        miner, i = MinerEscrowDeployer.null_address, 0
+        miner, i = self._deployer._config, 0
         while True:
 
             # Get the next miner
             next_miner = self.call().getNextMiner(miner)
 
-            if next_miner == MinerEscrowDeployer.null_address:
+            if next_miner == self._deployer._config.null_address:
                 raise StopIteration()
 
             yield next_miner
@@ -68,7 +68,7 @@ class MinerAgent(ContractAgent):
             miner = next_miner
             i += 1
 
-    def sample(self, quantity: int=10, additional_ursulas: float=1.7, attempts: int=5, duration: int=10) -> List[addr]:
+    def sample(self, quantity: int=10, additional_ursulas: float=1.7, attempts: int=5, duration: int=10) -> List[str]:
         """
         Select n random staking Ursulas, according to their stake distribution.
         The returned addresses are shuffled, so one can request more than needed and
@@ -92,8 +92,8 @@ class MinerAgent(ContractAgent):
 
         system_random = random.SystemRandom()
         n_select = round(quantity*additional_ursulas)            # Select more Ursulas
-        n_tokens = self.call().getAllLockedTokens()
 
+        n_tokens = self.call().getAllLockedTokens()              # Check for locked tokens
         if not n_tokens > 0:
             raise self.NotEnoughUrsulas('There are no locked tokens.')
 
