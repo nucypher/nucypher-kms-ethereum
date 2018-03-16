@@ -25,5 +25,5 @@ def test_nucypher_populus_project(testerchain):
     assert testerchain._project.project_dir == populus_project_dir
 
     # Ensure that solidity smart contacts are available, post-compile.
-    token_contract_identifier = NuCypherKMSTokenDeployer(blockchain=testerchain).contract_name()
+    token_contract_identifier = NuCypherKMSTokenDeployer(blockchain=testerchain)._contract_name
     assert token_contract_identifier in testerchain._project.compiled_contract_data
