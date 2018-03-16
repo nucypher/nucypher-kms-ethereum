@@ -18,7 +18,7 @@ class NuCypherKMSTokenAgent(EthereumContractAgent, deployer=NuCypherKMSTokenDepl
         all_known_address = self._blockchain._chain.registrar.get_contract_address(self._principal_contract_name)
         return all_known_address
 
-    def check_balance(self, address: str) -> int:
+    def balance(self, address: str) -> int:
         """Get the balance of a token address"""
         return self.call().balanceOf(address)
 
@@ -51,13 +51,13 @@ class MinerAgent(EthereumContractAgent, deployer=MinerEscrowDeployer):
         """
         Generates all miner addresses via cumulative sum on-network.
         """
-        miner, i = self._deployer._config, 0
+        miner, i = self._deployer.null_address, 0
         while True:
 
             # Get the next miner
             next_miner = self.call().getNextMiner(miner)
 
-            if next_miner == self._deployer._config.null_address:
+            if next_miner == self._deployer.null_address:
                 raise StopIteration()
 
             yield next_miner
@@ -99,7 +99,8 @@ class MinerAgent(EthereumContractAgent, deployer=MinerEscrowDeployer):
             points = [0] + sorted(system_random.randrange(n_tokens) for _ in range(n_select))
             deltas = [i-j for i, j in zip(points[1:], points[:-1])]
 
-            addrs, addr, shift = set(), MinerEscrowDeployer.null_address, 0
+            addrs, shift = set(), 0
+            addr = self._deployer.null_address      # Start with the null address
             for delta in deltas:
                 addr, shift = self.call().findCumSum(addr, delta+shift, duration)
                 addrs.add(addr)

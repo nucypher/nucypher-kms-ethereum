@@ -1,7 +1,6 @@
 from os.path import join, dirname, abspath
 
 import nkms_eth
-from nkms_eth.agents import NuCypherKMSTokenAgent
 from nkms_eth.deployers import NuCypherKMSTokenDeployer
 
 
