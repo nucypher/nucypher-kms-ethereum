@@ -8,8 +8,7 @@ A simple Python script to deploy contracts and then estimate gas for different m
 
 from nkms_eth.blockchain import TesterBlockchain
 from nkms_eth.escrow import Escrow
-from nkms_eth.token import NuCypherKMSToken
-import os
+from nkms_eth.agents import NuCypherKMSTokenAgent
 
 
 def main():
@@ -20,7 +19,7 @@ def main():
     print("Web3 providers are", web3.providers)
 
     # Create an ERC20 token
-    token = NuCypherKMSToken(blockchain=testerchain)
+    token = NuCypherKMSTokenAgent(blockchain=testerchain)
     token.arm()
     token.deploy()
 
