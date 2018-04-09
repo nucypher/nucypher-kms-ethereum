@@ -115,8 +115,8 @@ class ContractDeployer:
         incorrectly types the arming_word.
 
         """
-
-        # self.check_ready_to_deploy(fail=True)
+        if self.__armed is True:
+            raise self.ContractDeploymentError('{} deployer is already armed.'.format(self._contract_name))
 
         # If the blockchain network is public, prompt the user
         if self.blockchain._network not in self.blockchain.test_chains:
@@ -167,8 +167,8 @@ class NuCypherKMSTokenDeployer(ContractDeployer, NuCypherTokenConfig):
         The contract must be armed before it can be deployed.
         Deployment can only ever be executed exactly once!
         """
-
-        self.check_ready_to_deploy(fail=True)
+        is_ready, _disqualifications = self.check_ready_to_deploy(fail=True)
+        assert is_ready
 
         the_nucypher_token_contract, deployment_txhash = self.blockchain._chain.provider.deploy_contract(
             self._contract_name,
@@ -196,6 +196,7 @@ class DispatcherDeployer(ContractDeployer):
         super().__init__(blockchain=token_agent.blockchain)
 
     def deploy(self) -> str:
+
         dispatcher_contract, txhash = self.blockchain._chain.provider.deploy_contract(
             'Dispatcher', deploy_args=[self.target_contract.address],
             deploy_transaction={'from': self.token_agent.origin})
@@ -233,7 +234,8 @@ class MinerEscrowDeployer(ContractDeployer, NuCypherMinerConfig):
         """
 
         # Raise if not all-systems-go
-        self.check_ready_to_deploy(fail=True)
+        is_ready, _disqualifications = self.check_ready_to_deploy(fail=True)
+        assert is_ready
 
         # Build deployment arguments
         deploy_args = [self.token_agent.contract_address] + self.mining_coefficient    # config
@@ -295,7 +297,8 @@ class PolicyManagerDeployer(ContractDeployer):
         super().__init__(blockchain=self.miner_escrow_deployer.blockchain)
 
     def deploy(self) -> Dict[str, str]:
-        self.check_ready_to_deploy(fail=True)
+        is_ready, _disqualifications = self.check_ready_to_deploy(fail=True)
+        assert is_ready
 
         # Creator deploys the policy manager
         the_policy_manager_contract, deploy_txhash = self.blockchain._chain.provider.deploy_contract(
@@ -342,14 +345,17 @@ class UserEscrowDeployer(ContractDeployer):
 
     _contract_name = 'UserEscrow'  # TODO
 
-    def __init__(self, miner_escrow_deployer, policy_deployer, *args, **kwargs):
+    def __init__(self, miner_escrow_deployer, policy_deployer):
         self.miner_deployer = miner_escrow_deployer
         self.policy_deployer = policy_deployer
 
         self.token_deployer = miner_escrow_deployer.token_deployer
-        super(*args, **kwargs).__init__(blockchain=miner_escrow_deployer.blockchain)
+        super().__init__(blockchain=miner_escrow_deployer.blockchain)
 
     def deploy(self):
+        is_ready, _disqualifications = self.check_ready_to_deploy(fail=True)
+        assert is_ready
+
         deployment_args = [self.token_deployer.contract_address,
                            self.miner_deployer.contract_address,
                            self.policy_deployer.contract_address],
